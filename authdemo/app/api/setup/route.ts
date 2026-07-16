@@ -11,7 +11,15 @@ import { dbPool } from '../../../lib/auth';
  */
 export async function GET() {
   try {
-    const sql = readFileSync(join(process.cwd(), 'db', 'better-auth-tables.sql'), 'utf8');
+    const sqlRaw = readFileSync(join(process.cwd(), 'db', 'better-auth-tables.sql'), 'utf8');
+    // The verbatim file ends with GRANT ... TO caito_app (the real app's DB role).
+    // A standalone demo DB (Neon/local) has no such role and doesn't need it — the
+    // connection's own role already owns these tables. Strip GRANT lines so setup
+    // runs cleanly anywhere while the table DDL stays identical to production.
+    const sql = sqlRaw
+      .split(/\r?\n/)
+      .filter((line) => !/^\s*grant\b/i.test(line))
+      .join('\n');
     await dbPool.query(sql);
     await dbPool.query(`
       create table if not exists demo_invitations (
